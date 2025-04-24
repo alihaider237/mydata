@@ -1,7 +1,8 @@
 [
-  { "name": "Ali", "age": 25 },
-  { "name": "Ahmed", "age": 30 }
+  {
+    "key": "12345678",
+    "name": "aliza",
+    "age": 18,
+    "active": true
+  }
 ]
-{
-  "message": "hello"
-}

